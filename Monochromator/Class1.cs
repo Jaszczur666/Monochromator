@@ -4,6 +4,7 @@ using System.IO.Ports;
 using System.Threading;
 public class Monochromator
 {
+    private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
     private SerialPort SP;
     public string name;
     private int timeout;
@@ -34,9 +35,9 @@ public class Monochromator
         if (SP.IsOpen)
         {
             lambda = lambda.Replace(',', '.');
-            Console.WriteLine("DEBUG: " + name + " Attempting step to " + lambda);
+            log.Debug(name + " Attempting step to " + lambda);
             sendCommand("sl " + lambda);
-            Console.WriteLine("DEBUG: Reading response from " + name);
+            log.Debug("Reading response from " + name);
             finishedMove = false;
             moving = true;
         };
@@ -47,9 +48,9 @@ public class Monochromator
         string wl;
         wl = lambda.ToString();
         wl=wl.Replace(',', '.');
-        Console.WriteLine("DEBUG: " + name + " Attempting step to " + wl);
+        log.Debug(name + " Attempting step to " + wl);
         sendCommand("gt" + wl);
-        Console.WriteLine("DEBUG: Reading response from " + name);
+        log.Debug("Reading response from " + name);
         finishedMove = false;
         moving = true;
         //readResponse(out res);
@@ -61,9 +62,9 @@ public class Monochromator
         //Console.WriteLine("DEBUG: " + name + " Attempting step to " + lambda);
         //Console.WriteLine("Command: gt " + lambda);
         lambda=lambda.Replace(',', '.');
-        Console.WriteLine("scanto "+lambda);
+        log.Info("scanto "+lambda);
         sendCommand("gt " + lambda);
-        Console.WriteLine("DEBUG: Reading response from " + name);
+        log.Debug("Reading response from " + name);
         finishedMove = false;
         moving = true;
         //readResponse(out res);
@@ -78,7 +79,7 @@ public class Monochromator
         if (pname != "")
         {
             SP.PortName = pname;
-            Console.WriteLine(pname);
+            log.Info("pname "+pname);
         }
         if (!SP.IsOpen) SP.Open();
     }
@@ -88,49 +89,50 @@ public class Monochromator
         {
             
             SP.WriteLine(command);
-            Console.WriteLine("Command: " + command);
+            //Console.WriteLine("Command: " + command);
+            log.Debug("Command: " + command);
         }
     }
-    private void readResponse(out string res)
-    {
-        res = "Invalid response";
-        if (SP.IsOpen)
-        {
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            timeout = 1;
-            while (SP.BytesToRead == 0 && sw.ElapsedMilliseconds < timeout) ;
-            Console.WriteLine("DEBUG: " + name + " " + sw.ElapsedMilliseconds.ToString() + " ms waited for  start of the response");
-            res = "";
-            if (SP.BytesToRead > 0)
-            {
-                bool finish = false;
-                while (!finish || (sw.ElapsedMilliseconds < timeout))
-                {
+    //private void readResponse(out string res)
+    //{
+    //    res = "Invalid response";
+    //    if (SP.IsOpen)
+    //    {
+    //        Stopwatch sw = new Stopwatch();
+    //        sw.Start();
+    //        timeout = 1;
+    //        while (SP.BytesToRead == 0 && sw.ElapsedMilliseconds < timeout) ;
+    //        Console.WriteLine("DEBUG: " + name + " " + sw.ElapsedMilliseconds.ToString() + " ms waited for  start of the response");
+    //        res = "";
+    //        if (SP.BytesToRead > 0)
+    //        {
+    //            bool finish = false;
+    //            while (!finish || (sw.ElapsedMilliseconds < timeout))
+    //            {
 
-                    char znak = (char)SP.ReadByte();
-                    if (znak == '*' || znak == '!')
-                    {
-                        finish = true;
-                        finishedMove = true;
-                        Console.WriteLine("DEBUG: Final sign received");
-                    }
-                    res += znak.ToString();
-                    //Console.Write(znak);
-                }
-                if (!finish) res += "\r\n Awaria";
-                Console.WriteLine("DEBUG: " + name + " " + sw.ElapsedMilliseconds.ToString() + " ms waited for  end of the response");
-                //Console.WriteLine(" ");
-            }
+    //                char znak = (char)SP.ReadByte();
+    //                if (znak == '*' || znak == '!')
+    //                {
+    //                    finish = true;
+    //                    finishedMove = true;
+    //                    log.Debug("Final sign received, it was "+znak);
+    //                }
+    //                res += znak.ToString();
+    //                //Console.Write(znak);
+    //            }
+    //            if (!finish) res += "\r\n Awaria";
+    //            log.Debug( name + " " + sw.ElapsedMilliseconds.ToString() + " ms waited for  end of the response");
+    //            //Console.WriteLine(" ");
+    //        }
 
-            //res =this.SP.ReadTo("*");
-            Console.WriteLine("DEBUG: " + name + " Buffer length is " + SP.BytesToRead);
-            Console.WriteLine("DEBUG: " + name + " Response was: " + res);
-            Console.WriteLine("race? ");
-            Console.WriteLine("Debug: finished move flag is " + finishedMove);
-        }
+    //        //res =this.SP.ReadTo("*");
+    //        log.Debug(name + " Buffer length is " + SP.BytesToRead);
+    //        log.Debug(name + " Response was: " + res);
+    //        //Console.WriteLine("race? ");
+    //        Console.WriteLine("Debug: finished move flag is " + finishedMove);
+    //    }
 
-    }
+    //}
     public void Fix()
     {
         moving = false;
@@ -143,7 +145,7 @@ public class Monochromator
         Thread.Sleep(100);
         sendCommand("cw");
         Thread.Sleep(100);
-        Console.WriteLine(repeatNeeded);
+        log.Debug("Fix procedure, repeat needed value is "+repeatNeeded);
         moving = true;
     }
     public Monochromator()
@@ -188,10 +190,11 @@ public class Monochromator
                             MarkMoveFinished();
                             moving = false;
                         }
-                        Console.WriteLine("DEBUG: Final sign received");
+                        log.Debug("Final sign received, it was "+znak);
                         if (znak == '!')
                         {
-                            Console.WriteLine("Defect !!!! ");//repeatNeeded = false;//true;
+                            //Console.WriteLine("Defect !!!! ");//repeatNeeded = false;//true;
+                            log.Error("Communication with mono "+name+" failed");
                             repeatNeeded = true;
                         }
                     }
@@ -204,9 +207,9 @@ public class Monochromator
             }
 
             //res =this.SP.ReadTo("*");
-            Console.WriteLine("DEBUG: " + " Buffer length is " + ser.BytesToRead);
-            Console.WriteLine("DEBUG: " + " Response was: " + res);
-            Console.WriteLine("finishedMove flag is "+finishedMove);
+            log.Debug(" Buffer length is " + ser.BytesToRead);
+            log.Debug(" Response was: " + res);
+            log.Debug("finishedMove flag is "+finishedMove);
         }
     }
 
