@@ -8,23 +8,13 @@ public class Monochromator
     private SerialPort SP;
     public string name;
     private int timeout;
-    public  bool finishedMove = false;
-    public bool repeatNeeded = false;
+    public  bool responseObtained = false;
+    public bool bCommFailed = false;
+    private string lastCom;
+    private string lastresponse;    
     private bool moving;
     public void Goto(double lambda)
     {
-        //int temptimeout;
-        //temptimeout = timeout;
-        //if (SP.IsOpen)
-        //{
-        //    Console.WriteLine("DEBUG: " + name + " Attempting step to " + lambda.ToString());
-        //    sendCommand("sl" + lambda.ToString());
-        //    Console.WriteLine("DEBUG: Reading response from " + name);
-        //    timeout=300000; // Could take a while.
-        //    timeout = temptimeout;
-        //    finishedMove = false;
-        //    repeatNeeded = false;
-        //};
         Goto(lambda.ToString().Replace(',','.'));
     }
     public void Goto(string lambda)
@@ -35,43 +25,56 @@ public class Monochromator
         if (SP.IsOpen)
         {
             lambda = lambda.Replace(',', '.');
+            Stopwatch scansw = new Stopwatch();
+            scansw.Start();
             log.Debug(name + " Attempting step to " + lambda);
             sendCommand("sl " + lambda);
             log.Debug("Reading response from " + name);
-            finishedMove = false;
+            responseObtained = false;
             moving = true;
+            while (!responseObtained) Thread.Sleep(10);
+            log.Debug("Step took " + (scansw.ElapsedMilliseconds / 1000.0).ToString());
         };
     }
     public void ScanTo(double lambda)
     {
-        //string res;
         string wl;
         wl = lambda.ToString();
         wl=wl.Replace(',', '.');
+        ScanTo(wl);
+        /*Stopwatch scansw = new Stopwatch();
+        scansw.Start();
         log.Debug(name + " Attempting step to " + wl);
         sendCommand("gt" + wl);
         log.Debug("Reading response from " + name);
-        finishedMove = false;
+        responseObtained = false;
         moving = true;
-        //readResponse(out res);
-
+        while (!responseObtained) ;
+        log.Debug("Step took "+(scansw.ElapsedMilliseconds / 1000).ToString());*/
+    }
+    public void SelectGrating(string number) {
+        Stopwatch sw = new Stopwatch();
+        sw.Start();
+        sendCommand("gs" + number);
+        moving = true;
+        while (!responseObtained) Thread.Sleep(1);
+        log.Info("Gratinng change took " + (sw.ElapsedMilliseconds / 1000.0).ToString()+" seconds");
     }
     public void ScanTo(string lambda)
     {
-        //string res;
-        //Console.WriteLine("DEBUG: " + name + " Attempting step to " + lambda);
-        //Console.WriteLine("Command: gt " + lambda);
-        lambda=lambda.Replace(',', '.');
+        Stopwatch scansw = new Stopwatch();
+        scansw.Start();
+        lambda =lambda.Replace(',', '.');
         log.Info("scanto "+lambda);
         sendCommand("gt " + lambda);
         log.Debug("Reading response from " + name);
-        finishedMove = false;
+        responseObtained = false;
         moving = true;
-        //readResponse(out res);
-
+        while (!responseObtained) Thread.Sleep(10);
+        log.Debug("Step took " + (scansw.ElapsedMilliseconds / 1000.0).ToString(System.Globalization.CultureInfo.InvariantCulture) + " seconds");
     }
     public void MarkMoveFinished() {
-        finishedMove = true;
+        responseObtained = true;
     }
     public void InitializePort(string pname)
     {
@@ -89,63 +92,24 @@ public class Monochromator
         {
             
             SP.WriteLine(command);
-            //Console.WriteLine("Command: " + command);
+            lastCom = command;
             log.Debug("Command: " + command);
         }
     }
-    //private void readResponse(out string res)
-    //{
-    //    res = "Invalid response";
-    //    if (SP.IsOpen)
-    //    {
-    //        Stopwatch sw = new Stopwatch();
-    //        sw.Start();
-    //        timeout = 1;
-    //        while (SP.BytesToRead == 0 && sw.ElapsedMilliseconds < timeout) ;
-    //        Console.WriteLine("DEBUG: " + name + " " + sw.ElapsedMilliseconds.ToString() + " ms waited for  start of the response");
-    //        res = "";
-    //        if (SP.BytesToRead > 0)
-    //        {
-    //            bool finish = false;
-    //            while (!finish || (sw.ElapsedMilliseconds < timeout))
-    //            {
-
-    //                char znak = (char)SP.ReadByte();
-    //                if (znak == '*' || znak == '!')
-    //                {
-    //                    finish = true;
-    //                    finishedMove = true;
-    //                    log.Debug("Final sign received, it was "+znak);
-    //                }
-    //                res += znak.ToString();
-    //                //Console.Write(znak);
-    //            }
-    //            if (!finish) res += "\r\n Awaria";
-    //            log.Debug( name + " " + sw.ElapsedMilliseconds.ToString() + " ms waited for  end of the response");
-    //            //Console.WriteLine(" ");
-    //        }
-
-    //        //res =this.SP.ReadTo("*");
-    //        log.Debug(name + " Buffer length is " + SP.BytesToRead);
-    //        log.Debug(name + " Response was: " + res);
-    //        //Console.WriteLine("race? ");
-    //        Console.WriteLine("Debug: finished move flag is " + finishedMove);
-    //    }
-
-    //}
+    
     public void Fix()
     {
         moving = false;
-        repeatNeeded = false;
+        bCommFailed = false;
         sendCommand("cw");
-        repeatNeeded = false;
+        bCommFailed = false;
         Thread.Sleep(100);
         sendCommand("cw");
-        repeatNeeded = false;
+        bCommFailed = false;
         Thread.Sleep(100);
         sendCommand("cw");
         Thread.Sleep(100);
-        log.Debug("Fix procedure, repeat needed value is "+repeatNeeded);
+        log.Debug("Fix procedure, repeat needed value is "+bCommFailed);
         moving = true;
     }
     public Monochromator()
@@ -172,7 +136,6 @@ public class Monochromator
             Stopwatch sw = new Stopwatch();
             sw.Start();
             while (ser.BytesToRead == 0) ;// && sw.ElapsedMilliseconds < timeout) ;
-            //Console.WriteLine("DEBUG: " + " " + sw.ElapsedMilliseconds.ToString() + " ms waited for  start of the response");
             res = "";
             if (ser.BytesToRead > 0)
             {
@@ -184,7 +147,6 @@ public class Monochromator
                     if (znak == '*' || znak == '!')
                     {
                         finish = true;
-                        //finishedMove = true;
                         if (moving)
                         {
                             MarkMoveFinished();
@@ -193,23 +155,17 @@ public class Monochromator
                         log.Debug("Final sign received, it was "+znak);
                         if (znak == '!')
                         {
-                            //Console.WriteLine("Defect !!!! ");//repeatNeeded = false;//true;
                             log.Error("Communication with mono "+name+" failed");
-                            repeatNeeded = true;
+                            bCommFailed = true;
                         }
                     }
                     res += znak.ToString();
-                    //Console.Write(znak);
                 }
-                //if (!finish) res += "\r\n Awaria";
-                //Console.WriteLine("DEBUG: " + " " + sw.ElapsedMilliseconds.ToString() + " ms waited for  end of the response");
-                //Console.WriteLine(" ");
             }
-
-            //res =this.SP.ReadTo("*");
             log.Debug(" Buffer length is " + ser.BytesToRead);
             log.Debug(" Response was: " + res);
-            log.Debug("finishedMove flag is "+finishedMove);
+            lastresponse = res;
+            log.Debug("responseObtained flag is "+responseObtained);
         }
     }
 
